@@ -1,141 +1,135 @@
+import { Loader } from '@googlemaps/js-api-loader';
 import { useEffect, useRef, useState } from 'react';
 
 function App() {
-  const [userLocation, setUserLocation] = useState({ lat: 0, lng: 0 });
-  const [destination, setDestination] = useState({
-    lat: 45.7957,
-    lng: 15.96646,
-  });
-  // const [searchQuery, setSearchQuery] = useState('');
-  const [predictions, setPredictions] = useState([]);
+
+  //Ref to HTML elements
   const googleMapRef = useRef(null);
   const searchInput = useRef(null);
-  // get user geolocation
+
+  //Geolocation of the user
+  const [currentPosition, setCurrentPosition] = useState(null);
+  //Destination of the user
+  const [destination, setDestination] = useState(null);
+  //Direction display instance
+  const [directionsDisplay, setDirectionsDisplay] = useState(null);
+  //Map instance
+  const [map, setMap] = useState(null);
+  //Load the google maps API
+  const loader = new Loader({
+    apiKey: process.env.REACT_APP_API_KEY,
+    version: 'weekly',
+    libraries: ['places', 'routes']
+  });
+  //Markers
+  const [markers, setMarkers] = useState([]);
+
+
+  //Get the current position of the user
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) =>
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        })
-      );
-    }
+    navigator.geolocation.getCurrentPosition((position) => {
+      console.log(position.coords.latitude, position.coords.longitude);
+      setCurrentPosition({lat: position.coords.latitude, lng: position.coords.longitude});
+    }, () => {}, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
   }, []);
 
-  // initialize map
-  const initMap = () => {
-    const map = new window.google.maps.Map(googleMapRef.current, {
-      center: userLocation,
-      zoom: 15,
+
+  //Load the map and add autocomplete
+  useEffect(() => {
+    if(!currentPosition) {
+      return;
+    } 
+
+    loader.load().then(() => {
+      const map = new window.google.maps.Map(googleMapRef.current, {
+        center: currentPosition,
+        zoom: 8,
+      });
+
+      setMap(map);
+
+      if(!directionsDisplay) {
+        console.log('set');
+        setDirectionsDisplay(new window.google.maps.DirectionsRenderer({map: map}));
+      }
+
+      const options = {
+        fields: ["formatted_address", "geometry", "name"],
+        strictBounds: false,
+      };
+    
+      const autocomplete = new window.google.maps.places.Autocomplete(searchInput.current, options);
+      autocomplete.bindTo("bounds", map);
+
+      autocomplete.addListener("place_changed", () => {
+        
+        const place = autocomplete.getPlace();
+        setDestination(place);
+    
+        // If the place has no geometry, then present an error message
+        if (!place.geometry || !place.geometry.location) {
+          window.alert("No details available for input: '" + place.name + "'");
+          return;
+        }
+    
+        // If the place has a geometry, then present it on a map.
+        if (place.geometry.viewport) {
+          map.fitBounds(place.geometry.viewport);
+        } else {
+          map.setCenter(place.geometry.location);
+          map.setZoom(17); 
+        }
+      });
+    });
+  }, [currentPosition]);
+
+  //Display the route
+  useEffect(() => {
+
+    if(!directionsDisplay) {
+      return;
+    }
+
+    directionsDisplay.set('directions', null);
+    markers.forEach((marker) => {
+      marker.setMap(null);
     });
 
     const markerA = new window.google.maps.Marker({
-      position: userLocation,
-      map: map,
-      title: 'User location',
+      position: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+      title: "point A",
+      label: "A",
+      map: map
     });
+    const markerB = new window.google.maps.Marker({
+        position: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
+        title: "point B",
+        label: "B",
+        map: map
+    });
+    setMarkers([markerA, markerB]);
 
-    const autoCompleteService =
-      new window.google.maps.places.AutocompleteService(searchInput.current);
+    const directionsService = new window.google.maps.DirectionsService;
 
-    console.log('test');
-    // const markerB = new window.google.maps.Marker({
-    //   position: destination,
-    //   map: map,
-    //   title: 'destination',
-    // });
-
-    // const directionsService = new window.google.maps.DirectionsService();
-    // const directionsDisplay = new window.google.maps.DirectionsRenderer();
-
-    // directionsDisplay.setMap(map);
-    // setDirectionsService(directionsService);
-    // setDirectionsDisplay(directionsDisplay);
-    // calculateAndDisplayRoute(
-    //   directionsService,
-    //   directionsDisplay,
-    //   userLocation,
-    //   destination
-    // );
-    // const distanceBetweenMarkers =
-    //   window.google.maps.geometry.spherical.computeDistanceBetween(
-    //     new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
-    //     new window.google.maps.LatLng(destination.lat, destination.lng)
-    //   );
-
-    //   setDistance(distanceBetweenMarkers);
-  };
-
-  //  load map
-  useEffect(() => {
-    const script = document.createElement('script');
-    if (!window.google) {
-      script.async = true;
-      script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_API_KEY}&libraries=geometry,places`;
-      console.log('test2');
-      script.addEventListener('load', initMap);
-      document.body.appendChild(script);
-    }
-
-    return () => {
-      if (window.google) {
-        document.body.removeChild(script);
+    directionsService.route({
+      origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+      destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
+      avoidTolls: true,
+      avoidHighways: false,
+      travelMode: window.google.maps.TravelMode.DRIVING
+    }, function (response, status) {
+      if (status == window.google.maps.DirectionsStatus.OK) {
+        directionsDisplay.setDirections(response);
+      } else {
+        window.alert('Directions request failed due to ' + status);
       }
-    };
-  }, [userLocation, destination]);
-
-  // handle input
-  // const handleSubmit = (e) => {
-  //   e.preventDefault();
-  // console.log(searchQuery);
-  // };
-
-  // const handleInputChange = (value) => {
-  //   setSearchQuery(value);
-  //   if (value) {
-  //     autoCompleteService.getPlacePredictions(
-  //       {
-  //         input: value,
-  //         types: ['(regions)'], // You can specify the type of data you want (e.g., 'geocode', 'establishment', etc.)
-  //       },
-  //       (predictions, status) => {
-  //         if (status === 'OK') {
-  //           setPredictions(predictions);
-  //         } else {
-  //           setPredictions([]);
-  //         }
-  //       }
-  //     );
-  //   } else {
-  //     setPredictions([]);
-  //   }
-  //   setSearchQuery(value);
-  // };
-
-  // const handleSelect = (prediction) => {
-  //   setSearchQuery(prediction.description);
-  //   setPredictions([]); // Clear predictions
-  // };
+    });
+  }, [destination]);
 
   return (
     <section>
-      {/* <Input
-        destinationRef={destinationInputRef}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        ref={searchInput}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-        handleSelect={handleSelect}
-        setPredictions={setPredictions}
-        predictions={predictions}
-      /> */}
       <input type='text' ref={searchInput} />
       <div ref={googleMapRef} style={{ width: '100vw', height: '100vh' }}></div>
-      {/* <Map map={googleMapRef} /> */}
-      {/* <div ref={googleMapRef} style={{ width: '100%', height: '100vh' }}></div> */}
-      {/* <p>Distance between points: {distance}</p> */}
     </section>
   );
 }
