@@ -58,11 +58,9 @@ function App() {
 
   /**
    *
-   * Upisati 10 lokacija koje su jedna pored druge, odabrati lokacije koje su blizu te rute
    *
    * ispisati broj lokacija koje su na toj ruti i njihov info
    * https://medium.com/@yashwantltce/a-simple-way-to-find-places-along-the-route-using-google-maps-api-4237fb452ec2
-   *
    *
    * 1. upisati 10 lokacija
    * 2. setiranje rute između korisnika i destinacije
@@ -92,6 +90,8 @@ function App() {
   
   //Markers
   const [markers, setMarkers] = useState([]);
+  //  polyline
+  const [polyline, setPolyline] = useState(null);
 
   //Get the current position of the user
   useEffect(() => {
@@ -108,7 +108,38 @@ function App() {
     );
   }, []);
 
+  const addPolyline = () => {
+    if(map) {
 
+      const polylineCoordinates = [
+        { lat: 37.772, lng: -122.214 },
+        { lat: 21.291, lng: -157.821 },
+        { lat: -18.142, lng: 178.431 },
+        { lat: -27.467, lng: 153.027 },
+      ];
+        // Create the Polyline object
+      const newPolyline = new window.google.maps.Polyline({
+        path: polylineCoordinates,
+        geodesic: true,
+        strokeColor: '#FF0000',
+        strokeOpacity: 1.0,
+        strokeWeight: 3,
+      });
+
+       // Display the polyline on the map
+      newPolyline.setMap(map);
+
+      setPolyline(newPolyline);
+    }
+  }
+  const removePolyline = () => {
+     if (polyline) {
+      // Remove the polyline from the map
+      polyline.setMap(null);
+      setPolyline(null);
+    }
+  }
+ 
   //Load the map and add autocomplete
   useEffect(() => {
     if (!currentPosition) {
@@ -119,10 +150,12 @@ function App() {
       const map = new window.google.maps.Map(googleMapRef.current, {
         center: currentPosition,
         zoom: 8,
+        mapTypeId: 'terrain'
       });
 
       setMap(map);
 
+ 
       if (!directionsDisplay) {
         console.log('set');
         setDirectionsDisplay(
@@ -194,16 +227,18 @@ function App() {
 
       function (response, status) {
         if (status === window.google.maps.DirectionsStatus.OK) {
-          // console.log(response)
+
           directionsDisplay.setDirections(response);
           const route = response.routes[0];
           const routePath = route.overview_path;
+
           console.log(route)
+          
           const placesService = new window.google.maps.places.PlacesService(map)
            var request = {
-            location: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()), // Use the start point of the route as a reference
-            radius: 100, // Search within a 50 km radius of the route
-            types: ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'food'] // Specify the type of places you're interested in
+            location: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()), 
+            radius: 100, 
+            types: ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'food'] 
         };
 
          placesService.nearbySearch(request, function(results, status) {
@@ -218,39 +253,31 @@ function App() {
                             location: results[i].geometry.location,
                             stopover: true
                         };
-                        customWaypoints.push(waypoint)
-                        // route.waypoints = customWaypoints
+                        customWaypoints.push(waypoint)  
                     }
                 }
 
                 // Now you have updated waypoints, and you can display the route with these waypoints.
                 directionsService.route({
-                  origin: new window.google.maps.LatLng(
-          currentPosition.lat,
-          currentPosition.lng
-        ),
-        destination: new window.google.maps.LatLng(
-          destination.geometry.location.lat(),
-          destination.geometry.location.lng()
-        ),
-        waypoints: customWaypoints,
-        travelMode: window.google.maps.TravelMode.WALKING,
+                  origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+                  destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
+                  waypoints: customWaypoints,
+                  travelMode: window.google.maps.TravelMode.WALKING,
                 }, function(updatedRoute, updatedStatus) {
                     if (updatedStatus === 'OK') {
                         // Display the route with waypoints
                       setDirectionsDisplay(new window.google.maps.DirectionsRenderer({
                             map: map,
                             directions: updatedRoute
-                        }))
+                      }));
 
-                      directionsDisplay.set('directions', null);
-                      
+                      directionsDisplay.set('directions', null);  
                     }
                 });
             }
         });
-        }else {
-        window.alert('Directions request failed due to ' + status);
+        } else {
+           window.alert('Directions request failed due to ' + status);
       }
       });
     
@@ -258,7 +285,11 @@ function App() {
 
   return (
     <section>
-      <input type='text' ref={searchInput} />
+    <div className='autocomplete-wrapper'>
+        <input type='text' ref={searchInput} />
+        <button onClick={addPolyline}>Add Polyline</button>
+        <button onClick ={removePolyline}>Remove Polyline</button>
+    </div>
       <div ref={googleMapRef} style={{ width: '100vw', height: '100vh' }}></div>
     </section>
   );
