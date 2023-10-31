@@ -230,19 +230,41 @@ function App() {
           const route = response.routes[0];
           const legs = route.legs;
           const waypoints = [];
-
+         
           directionsDisplay.setDirections(response);
+          
 
+          const placesService = new window.google.maps.places.PlacesService(map);
+
+          // setup waypoints on route
           for(const leg of legs) {
             const steps = leg.steps;
             for(const step of steps) {
-              const startLocation = step.start_location;
+              const endLocation = step.end_location;
               waypoints.push({
-                location: startLocation,
+                location: endLocation,
                 stopover: true,
               });
             }
           }
+          
+   
+          // get the nearest places around the waypoints
+          for(let i = 0; i <= waypoints.length - 1; i++) {
+             const placesRequest = {
+            location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
+            radius: 30,
+            type: ['restaurant', 'bar', 'food', 'cafe'],
+          }
+          placesService.nearbySearch(placesRequest, (results, status) => {
+            if(status === window.google.maps.places.PlacesServiceStatus.OK) {
+              let places = [...new Set(results)]
+               for (const place of places) {
+                console.log(place.name, place.geometry.location);
+              }
+            }
+          });
+        }
 
           const request = {
             origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
