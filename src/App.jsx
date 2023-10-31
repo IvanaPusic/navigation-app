@@ -227,58 +227,43 @@ function App() {
 
       function (response, status) {
         if (status === window.google.maps.DirectionsStatus.OK) {
+          const route = response.routes[0];
+          const legs = route.legs;
+          const waypoints = [];
 
           directionsDisplay.setDirections(response);
-          const route = response.routes[0];
-          const routePath = route.overview_path;
 
-          console.log(route)
-          
-          const placesService = new window.google.maps.places.PlacesService(map)
-           var request = {
-            location: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()), 
-            radius: 100, 
-            types: ['restaurant', 'bar', 'cafe', 'tourist_attraction', 'food'] 
-        };
-
-         placesService.nearbySearch(request, function(results, status) {
-          let customWaypoints = [];
-            if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-              console.log(results)
-                for (let i = 0; i < results.length; i++) {
-                    // Check if the place is along the route
-                    if (window.google.maps.geometry.poly.isLocationOnEdge(results[i].geometry.location, new window.google.maps.Polyline({ path: routePath }), 0.1)) {
-                        // This place is along the route, set it as a waypoint
-                        var waypoint = {
-                            location: results[i].geometry.location,
-                            stopover: true
-                        };
-                        customWaypoints.push(waypoint)  
-                    }
-                }
-
-                // Now you have updated waypoints, and you can display the route with these waypoints.
-                directionsService.route({
-                  origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
-                  destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
-                  waypoints: customWaypoints,
-                  travelMode: window.google.maps.TravelMode.WALKING,
-                }, function(updatedRoute, updatedStatus) {
-                    if (updatedStatus === 'OK') {
-                        // Display the route with waypoints
-                      setDirectionsDisplay(new window.google.maps.DirectionsRenderer({
-                            map: map,
-                            directions: updatedRoute
-                      }));
-
-                      directionsDisplay.set('directions', null);  
-                    }
-                });
+          for(const leg of legs) {
+            const steps = leg.steps;
+            for(const step of steps) {
+              const startLocation = step.start_location;
+              waypoints.push({
+                location: startLocation,
+                stopover: true,
+              });
             }
-        });
+          }
+
+          const request = {
+            origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+            destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
+            waypoints: waypoints,
+            travelMode: window.google.maps.TravelMode.WALKING,
+          }
+        
+          directionsService.route(request, function(updatedRoute, updatedStatus) {
+            if(updatedStatus === 'OK') {
+              setDirectionsDisplay(new window.google.maps.DirectionsRenderer({
+                map: map,
+                directions: updatedRoute,
+                preserveViewport: true
+              }));
+              directionsDisplay.set('directions', null);  
+            }
+          });
         } else {
            window.alert('Directions request failed due to ' + status);
-      }
+          }
       });
     
   }, [destination]);
