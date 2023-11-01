@@ -229,7 +229,7 @@ function App() {
           const route = response.routes[0];
           const legs = route.legs;
           const waypoints = [];
-          const radius = 200;
+          const radius = 150;
           
           directionsDisplay.setDirections(response);
           
