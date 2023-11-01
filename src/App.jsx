@@ -66,6 +66,7 @@ function App() {
    * 2. setiranje rute između korisnika i destinacije
    * 3. naći lokacije u blizini rute
    * 4. napraviti rutu sa lokacijama kao stop mjestima koje su nađene u prethodnom koraku
+   * -- generirati possible locations kao stopove waypointova na ruti ako su u krugu od 150 m od tražene rute.
    * 5. ispisati lokacije koje su na ruti i njihov info
    */
   //Ref to HTML elements
@@ -150,12 +151,10 @@ function App() {
       const map = new window.google.maps.Map(googleMapRef.current, {
         center: currentPosition,
         zoom: 8,
-        mapTypeId: 'terrain'
       });
 
       setMap(map);
 
- 
       if (!directionsDisplay) {
         console.log('set');
         setDirectionsDisplay(
@@ -230,41 +229,51 @@ function App() {
           const route = response.routes[0];
           const legs = route.legs;
           const waypoints = [];
-         
+          const radius = 200;
+          
           directionsDisplay.setDirections(response);
           
+          for(const waypoint of possibleLocations) {
+            for(const leg of legs) {
+              const steps = leg.steps;
+              for(const step of steps) {
+                // calculate distance between waypoints and route
+                const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+                  new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
+                  new window.google.maps.LatLng(step.end_location.lat(), step.end_location.lng()),
+                );
 
+                if(distance <= radius) {
+                  waypoints.push({
+                    location: new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
+                    stopover: true,
+                  });
+                  console.log('waypoints',waypoints);
+                  directionsDisplay.set('directions', null); 
+                }
+              }
+            } 
+         }
+         
           const placesService = new window.google.maps.places.PlacesService(map);
-
-          // setup waypoints on route
-          for(const leg of legs) {
-            const steps = leg.steps;
-            for(const step of steps) {
-              const endLocation = step.end_location;
-              waypoints.push({
-                location: endLocation,
-                stopover: true,
-              });
-            }
-          }
-          
    
           // get the nearest places around the waypoints
           for(let i = 0; i <= waypoints.length - 1; i++) {
-             const placesRequest = {
-            location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
-            radius: 30,
-            type: ['restaurant', 'bar', 'food', 'cafe'],
-          }
-          placesService.nearbySearch(placesRequest, (results, status) => {
-            if(status === window.google.maps.places.PlacesServiceStatus.OK) {
-              let places = [...new Set(results)]
-               for (const place of places) {
-                console.log(place.name, place.geometry.location);
-              }
+            const placesRequest = {
+              location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
+              radius: 30,
+              type: ['restaurant', 'bar', 'food', 'cafe'],
             }
-          });
-        }
+
+            placesService.nearbySearch(placesRequest, (results, status) => {
+              if(status === window.google.maps.places.PlacesServiceStatus.OK) {
+                let places = [...new Set(results)]
+                for (const place of places) {
+                  console.log('Place',place.name, place.geometry.location);
+                }
+              }
+            });
+          }
 
           const request = {
             origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
@@ -287,7 +296,6 @@ function App() {
            window.alert('Directions request failed due to ' + status);
           }
       });
-    
   }, [destination]);
 
   return (
