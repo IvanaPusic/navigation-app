@@ -94,6 +94,35 @@ function App() {
   //  polyline
   const [polyline, setPolyline] = useState(null);
 
+  const getChatCompletion = async () => {
+   const data = {
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": `Give me a list of landmarks that are between ${currentPosition} and Trg bana Josipa Jelačića, Zagreb.`}],
+    "temperature": 0.7
+   };
+
+   fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-type': 'application/json',
+      'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
+    },
+    body: JSON.stringify(data)
+   })
+   .then(response => {
+    if(!response.ok){
+      throw new Error('Network response was not ok')
+    }
+    return response.json();
+   })
+   .then(data => {
+    console.log(data)
+   })
+   .catch(error => {
+    console.error('There has been a problem with your fetch operation:', error);
+   })
+  }
+
   //Get the current position of the user
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -107,39 +136,12 @@ function App() {
       () => {},
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
+   
   }, []);
 
-  const addPolyline = () => {
-    if(map) {
-
-      const polylineCoordinates = [
-        { lat: 37.772, lng: -122.214 },
-        { lat: 21.291, lng: -157.821 },
-        { lat: -18.142, lng: 178.431 },
-        { lat: -27.467, lng: 153.027 },
-      ];
-        // Create the Polyline object
-      const newPolyline = new window.google.maps.Polyline({
-        path: polylineCoordinates,
-        geodesic: true,
-        strokeColor: '#FF0000',
-        strokeOpacity: 1.0,
-        strokeWeight: 3,
-      });
-
-       // Display the polyline on the map
-      newPolyline.setMap(map);
-
-      setPolyline(newPolyline);
-    }
-  }
-  const removePolyline = () => {
-     if (polyline) {
-      // Remove the polyline from the map
-      polyline.setMap(null);
-      setPolyline(null);
-    }
-  }
+  useEffect(() => {
+    getChatCompletion()
+  },[])
  
   //Load the map and add autocomplete
   useEffect(() => {
@@ -192,6 +194,8 @@ function App() {
         }
       });
     });
+
+
   }, [currentPosition]);
 
 
@@ -242,7 +246,7 @@ function App() {
                   new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
                   new window.google.maps.LatLng(step.end_location.lat(), step.end_location.lng()),
                 );
-
+                
                 if(distance <= radius) {
                   waypoints.push({
                     location: new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
@@ -296,18 +300,27 @@ function App() {
            window.alert('Directions request failed due to ' + status);
           }
       });
+
   }, [destination]);
+
 
   return (
     <section>
-    <div className='autocomplete-wrapper'>
+    <form className='autocomplete-wrapper' onSubmit={getChatCompletion}>
         <input type='text' ref={searchInput} />
-        <button onClick={addPolyline}>Add Polyline</button>
-        <button onClick ={removePolyline}>Remove Polyline</button>
-    </div>
+    </form>
       <div ref={googleMapRef} style={{ width: '100vw', height: '100vh' }}></div>
     </section>
   );
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
