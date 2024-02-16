@@ -317,12 +317,11 @@ useEffect(() => {
               directionsDisplay.set('directions', null);  
             }
           });
-        } else {
+          } else {
            window.alert('Directions request failed due to ' + status);
           }
-        
-          }
-      });
+       }
+    });
   }, [destination]);
 
   
