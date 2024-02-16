@@ -15,7 +15,7 @@ body {
   font-size: 1rem;
 }
 
-.autocomplete-wrapper {
+.input-wrapper {
   display: flex;
   justify-content: space-around;
   gap: 1rem;
@@ -24,6 +24,8 @@ body {
 input {
   border: none;
   outline: none;
+  padding: 1rem;
+  font-size: 1rem;
 }
 input, button {
  border-radius: 0.5rem;

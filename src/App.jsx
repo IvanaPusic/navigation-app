@@ -81,10 +81,14 @@ function App() {
   const [directionsDisplay, setDirectionsDisplay] = useState(null);
   //Map instance
   const [map, setMap] = useState(null);
+  // users city
+  const [city, setCity] = useState('');
+  // list of historical landmarks
+  const [landmarks, setLandmarks] = useState([])
 
   //Load the google maps API
   const loader = new Loader({
-    apiKey: process.env.REACT_APP_API_KEY,
+    apiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
     version: 'weekly',
     libraries: ['places', 'routes'],
   });
@@ -94,58 +98,73 @@ function App() {
   //  polyline
   const [polyline, setPolyline] = useState(null);
 
-  const getChatCompletion = async () => {
-   const data = {
-    "model": "gpt-3.5-turbo",
-    "messages": [{"role": "user", "content": `Give me a list of landmarks that are between ${currentPosition} and Trg bana Josipa Jelačića, Zagreb.`}],
-    "temperature": 0.7
-   };
-
-   fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-type': 'application/json',
-      'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
-    },
-    body: JSON.stringify(data)
-   })
-   .then(response => {
-    if(!response.ok){
-      throw new Error('Network response was not ok')
+    // Get list of historical landmarks based on users city
+  const getChatCompletion = async (city) => {
+    try {
+      const data = {
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": `give me a list of 10 historical landmarks in ${city} with coordinates in this format [{ lat: 0, lng: 0, name: ' ' },] and json without additional words`}],
+        "temperature": 0.7
+      };
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+        'Content-type': 'application/json',
+        'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
+        },
+        body: JSON.stringify(data)
+      })
+      const items = await response.json()
+      console.log('items: ', items);
+      console.log(JSON.parse(items.choices[0].message.content))
+      setLandmarks(JSON.parse(items.choices[0].message.content))
+      // setWaypoints(JSON.parse(items.choices[0].message.content))
+      localStorage.setItem(city, items.choices[0].message.content)
+    } catch (error) {
+      console.error(error)
     }
-    return response.json();
-   })
-   .then(data => {
-    console.log(data)
-   })
-   .catch(error => {
-    console.error('There has been a problem with your fetch operation:', error);
-   })
   }
 
-  //Get the current position of the user
-  useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log(position.coords.latitude, position.coords.longitude);
-        setCurrentPosition({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
-   
-  }, []);
+  const getCityFromCoords = async (lat,lng) => {
+    try {
+      const city = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`)
+      const data = await city.json();
+      setCity(data.results[6].formatted_address)
+      const currentLandmarks = localStorage.getItem(data.results[6].formatted_address);
+      console.log(data.results[6].formatted_address);
+      console.log('trtrt', JSON.parse(currentLandmarks));
+      if(currentLandmarks) {
+        setLandmarks(JSON.parse(currentLandmarks));
+      }else {
+        await getChatCompletion(data.results[6].formatted_address)
+      }
+      // console.log(data.results[6].formatted_address);
+      // if(!localStorage.getItem(data.results[6].formatted_address)) {
+      //  await getChatCompletion(data.results[6].formatted_address)
+      // }
+    } catch (error) {
+      console.error(error)
+    }
+  }; 
 
-  useEffect(() => {
-    getChatCompletion()
-  },[])
- 
+  //Get the current position of the user
+useEffect(() => {
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      setCurrentPosition({ lat: position.coords.latitude, lng: position.coords.longitude });
+      getCityFromCoords(position.coords.latitude, position.coords.longitude)
+    },
+    () => {},
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+  );
+  // if(!localStorage.getItem(city)) {
+  //   getChatCompletion(city)
+  // }
+}, []);
+
   //Load the map and add autocomplete
   useEffect(() => {
-    if (!currentPosition) {
+    if (!currentPosition || !landmarks) {
       return;
     }
 
@@ -196,11 +215,12 @@ function App() {
     });
 
 
-  }, [currentPosition]);
+  }, [currentPosition, landmarks]);
 
 
   //Display the route
   useEffect(() => {
+    console.log('directionDisplay', directionsDisplay);
     if (!directionsDisplay) {
       return;
     }
@@ -224,7 +244,7 @@ function App() {
           destination.geometry.location.lng()
         ),
         avoidTolls: true,
-        avoidHighways: false,
+        avoidHighways: true,
         travelMode: window.google.maps.TravelMode.WALKING,
       },
 
@@ -233,11 +253,11 @@ function App() {
           const route = response.routes[0];
           const legs = route.legs;
           const waypoints = [];
-          const radius = 150;
+          const radius = 1500;
           
           directionsDisplay.setDirections(response);
-          
-          for(const waypoint of possibleLocations) {
+          console.log('landmarks:', landmarks);
+          for(const waypoint of landmarks) {
             for(const leg of legs) {
               const steps = leg.steps;
               for(const step of steps) {
@@ -246,7 +266,7 @@ function App() {
                   new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
                   new window.google.maps.LatLng(step.end_location.lat(), step.end_location.lng()),
                 );
-                
+                console.log('radius, distance, is in, location', radius, distance, (distance <= radius), waypoints )
                 if(distance <= radius) {
                   waypoints.push({
                     location: new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
@@ -257,29 +277,30 @@ function App() {
                 }
               }
             } 
-         }
-         
-          const placesService = new window.google.maps.places.PlacesService(map);
-   
-          // get the nearest places around the waypoints
-          for(let i = 0; i <= waypoints.length - 1; i++) {
-            const placesRequest = {
-              location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
-              radius: 30,
-              type: ['restaurant', 'bar', 'food', 'cafe'],
-            }
-
-            placesService.nearbySearch(placesRequest, (results, status) => {
-              if(status === window.google.maps.places.PlacesServiceStatus.OK) {
-                let places = [...new Set(results)]
-                for (const place of places) {
-                  console.log('Place',place.name, place.geometry.location);
-                }
-              }
-            });
           }
+         
+        //   const placesService = new window.google.maps.places.PlacesService(map);
+   
+        //   // get the nearest places around the waypoints
+        //   for(let i = 0; i <= waypoints.length - 1; i++) {
+        //     const placesRequest = {
+        //       location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
+        //       radius: 30,
+        //       type: ['restaurant', 'bar', 'food', 'cafe'],
+        //     }
 
-          const request = {
+        //     placesService.nearbySearch(placesRequest, (results, status) => {
+        //       if(status === window.google.maps.places.PlacesServiceStatus.OK) {
+        //         let places = [...new Set(results)]
+        //         for (const place of places) {
+        //           // console.log('Place',place.name, place.geometry.location);
+        //         }
+        //       }
+        //     });
+        //   }
+
+          if(waypoints.length > 0) {
+              const request = {
             origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
             destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
             waypoints: waypoints,
@@ -299,28 +320,20 @@ function App() {
         } else {
            window.alert('Directions request failed due to ' + status);
           }
+        
+          }
       });
-
   }, [destination]);
 
-
+  
   return (
     <section>
-    <form className='autocomplete-wrapper' onSubmit={getChatCompletion}>
+      <div className='input-wrapper'>
         <input type='text' ref={searchInput} />
-    </form>
+      </div>
       <div ref={googleMapRef} style={{ width: '100vw', height: '100vh' }}></div>
     </section>
   );
 }
 
 export default App;
-
-
-
-
-
-
-
-
-
