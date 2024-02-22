@@ -5,54 +5,54 @@ function App() {
   
   const possibleLocations = [
     {
-     lat: 45.770863,
-     lng: 15.857940,
-     name: 'skydive croatia'
+      lat: 45.770863,
+      lng: 15.857940,
+      name: 'skydive croatia'
     },
     {
-     lat: 45.763354,
-     lng: 15.868353,
-     name: 'sportski centar lučko'
+      lat: 45.763354,
+      lng: 15.868353,
+      name: 'sportski centar lučko'
     },
     {
-     lat: 45.760026,
-     lng: 15.895544,
-     name: 'royal apartments & rooms'
+      lat: 45.760026,
+      lng: 15.895544,
+      name: 'royal apartments & rooms'
     },
     {
-     lat: 45.762487,
-     lng: 15.915800,
-     name: 'profa caffe & pub'
+      lat: 45.762487,
+      lng: 15.915800,
+      name: 'profa caffe & pub'
     },
     {
-     lat: 45.764780,
-     lng: 15.925699,
-     name: 'suman d.o.o'
+      lat: 45.764780,
+      lng: 15.925699,
+      name: 'suman d.o.o'
     },
     {
-     lat: 45.777850,
-     lng: 15.949579,
-     name: 'mc donalds rotor'
+      lat: 45.777850,
+      lng: 15.949579,
+      name: 'mc donalds rotor'
     },
     {
-     lat: 45.784435,
-     lng: 15.950761,
-     name: 'pizzeria stara sava'
+      lat: 45.784435,
+      lng: 15.950761,
+      name: 'pizzeria stara sava'
     },
     {
-     lat: 45.787396,
-     lng: 15.953021,
-     name: 'hendrick\'s gin garden'
+      lat: 45.787396,
+      lng: 15.953021,
+      name: 'hendrick\'s gin garden'
     },
     {
-     lat: 45.790257,
-     lng: 15.955924,
-     name: 'vintage industrial'
+      lat: 45.790257,
+      lng: 15.955924,
+      name: 'vintage industrial'
     },
     {
-     lat: 45.795086,
-     lng: 15.967092,
-     name: 'caffe bar marko polo'
+      lat: 45.795086,
+      lng: 15.967092,
+      name: 'caffe bar marko polo'
     },
   ];
 
@@ -81,11 +81,9 @@ function App() {
   const [directionsDisplay, setDirectionsDisplay] = useState(null);
   //Map instance
   const [map, setMap] = useState(null);
-  // users city
-  const [city, setCity] = useState('');
   // list of historical landmarks
   const [landmarks, setLandmarks] = useState([])
-
+ 
   //Load the google maps API
   const loader = new Loader({
     apiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
@@ -98,71 +96,76 @@ function App() {
   //  polyline
   const [polyline, setPolyline] = useState(null);
 
-    // Get list of historical landmarks based on users city
+  // Get list of historical landmarks based on users city
   const getChatCompletion = async (city) => {
     try {
       const data = {
         "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": `give me a list of 10 historical landmarks in ${city} with coordinates in this format [{ lat: 0, lng: 0, name: ' ' },] and json without additional words`}],
+        "messages": [{"role": "user", "content": `give me a list of 10 historical landmarks in ${city} with coordinates in format of json array of objects without additional words`}],
         "temperature": 0.7
       };
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-        'Content-type': 'application/json',
-        'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
+          'Content-type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_KEY}`,
         },
         body: JSON.stringify(data)
       })
       const items = await response.json()
-      console.log('items: ', items);
-      console.log(JSON.parse(items.choices[0].message.content))
-      setLandmarks(JSON.parse(items.choices[0].message.content))
-      // setWaypoints(JSON.parse(items.choices[0].message.content))
+      console.log('items: ', JSON.parse(JSON.stringify(items.choices[0].message.content)));
+      console.log(items.choices[0].message.content);
+      
+      setLandmarks(items.choices[0].message.content)
       localStorage.setItem(city, items.choices[0].message.content)
     } catch (error) {
       console.error(error)
     }
   }
 
-  const getCityFromCoords = async (lat,lng) => {
-    try {
-      const city = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`)
-      const data = await city.json();
-      setCity(data.results[6].formatted_address)
-      const currentLandmarks = localStorage.getItem(data.results[6].formatted_address);
-      console.log(data.results[6].formatted_address);
-      console.log('trtrt', JSON.parse(currentLandmarks));
-      if(currentLandmarks) {
-        setLandmarks(JSON.parse(currentLandmarks));
-      }else {
-        await getChatCompletion(data.results[6].formatted_address)
-      }
-      // console.log(data.results[6].formatted_address);
-      // if(!localStorage.getItem(data.results[6].formatted_address)) {
-      //  await getChatCompletion(data.results[6].formatted_address)
-      // }
-    } catch (error) {
-      console.error(error)
+  useEffect(() => {
+    // 15. START //
+    let isMounted = true; 
+    if(!isMounted) {
+      return;
     }
-  }; 
+    const getCityFromCoords = async (lat, lng) => {
+      try {
+        const city = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`);
+        const data = await city.json();
+        console.log('city data', data.results[9].address_components[0].long_name);
 
-  //Get the current position of the user
-useEffect(() => {
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      setCurrentPosition({ lat: position.coords.latitude, lng: position.coords.longitude });
-      getCityFromCoords(position.coords.latitude, position.coords.longitude)
-    },
-    () => {},
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-  );
-  // if(!localStorage.getItem(city)) {
-  //   getChatCompletion(city)
-  // }
-}, []);
+        const currentLandmarks = localStorage.getItem(data.results[9].address_components[0].long_name);
+        console.log('landmarks from local storage', JSON.parse(currentLandmarks));
 
-  //Load the map and add autocomplete
+        if (currentLandmarks && isMounted) {
+          setLandmarks(JSON.parse(currentLandmarks));
+        } else if (isMounted) {
+          await getChatCompletion(data.results[9].address_components[0].long_name);
+        }
+
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (isMounted) {
+          setCurrentPosition({ lat: position.coords.latitude, lng: position.coords.longitude });
+          getCityFromCoords(position.coords.latitude, position.coords.longitude);
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+
+    return () => {
+      isMounted = false; 
+    };
+
+  }, []);
+
   useEffect(() => {
     if (!currentPosition || !landmarks) {
       return;
@@ -177,7 +180,8 @@ useEffect(() => {
       setMap(map);
 
       if (!directionsDisplay) {
-        console.log('set');
+        console.log('set'); 
+        // 15. END - removed landmarks from dependency array // 
         setDirectionsDisplay(
           new window.google.maps.DirectionsRenderer({ map: map })
         );
@@ -196,15 +200,13 @@ useEffect(() => {
 
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
-        setDestination(place);
-
-        // If the place has no geometry, then present an error message
+        
         if (!place.geometry || !place.geometry.location) {
           window.alert("No details available for input: '" + place.name + "'");
           return;
         }
+        setDestination(place);
 
-        // If the place has a geometry, then present it on a map.
         if (place.geometry.viewport) {
           map.fitBounds(place.geometry.viewport);
         } else {
@@ -213,19 +215,13 @@ useEffect(() => {
         }
       });
     });
+  }, [currentPosition]);
 
 
-  }, [currentPosition, landmarks]);
-
-
-  //Display the route
   useEffect(() => {
-    console.log('directionDisplay', directionsDisplay);
-    if (!directionsDisplay) {
+    if (!currentPosition || !destination || !landmarks || !directionsDisplay || !map) {
       return;
     }
-
-    directionsDisplay.set('directions', null);
 
     markers.forEach((marker) => {
       marker.setMap(null);
@@ -235,96 +231,105 @@ useEffect(() => {
 
     directionsService.route(
       {
-        origin: new window.google.maps.LatLng(
-          currentPosition.lat,
-          currentPosition.lng
-        ),
-        destination: new window.google.maps.LatLng(
-          destination.geometry.location.lat(),
-          destination.geometry.location.lng()
-        ),
+        origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+        destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
         avoidTolls: true,
         avoidHighways: true,
         travelMode: window.google.maps.TravelMode.WALKING,
       },
-
-      function (response, status) {
+      (response, status) => {
         if (status === window.google.maps.DirectionsStatus.OK) {
           const route = response.routes[0];
-          const legs = route.legs;
+          const steps = route.legs.flatMap(leg => leg.steps);
           const waypoints = [];
-          const radius = 1500;
-          
-          directionsDisplay.setDirections(response);
-          console.log('landmarks:', landmarks);
-          for(const waypoint of landmarks) {
-            for(const leg of legs) {
-              const steps = leg.steps;
-              for(const step of steps) {
-                // calculate distance between waypoints and route
-                const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-                  new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
-                  new window.google.maps.LatLng(step.end_location.lat(), step.end_location.lng()),
-                );
-                console.log('radius, distance, is in, location', radius, distance, (distance <= radius), waypoints )
-                if(distance <= radius) {
-                  waypoints.push({
-                    location: new window.google.maps.LatLng(waypoint.lat, waypoint.lng),
-                    stopover: true,
-                  });
-                  console.log('waypoints',waypoints);
-                  directionsDisplay.set('directions', null); 
-                }
-              }
-            } 
-          }
-         
-        //   const placesService = new window.google.maps.places.PlacesService(map);
-   
-        //   // get the nearest places around the waypoints
-        //   for(let i = 0; i <= waypoints.length - 1; i++) {
-        //     const placesRequest = {
-        //       location: new window.google.maps.LatLng(waypoints[i].location.lat(), waypoints[i].location.lng()),
-        //       radius: 30,
-        //       type: ['restaurant', 'bar', 'food', 'cafe'],
-        //     }
+          const radius = 300;
 
-        //     placesService.nearbySearch(placesRequest, (results, status) => {
-        //       if(status === window.google.maps.places.PlacesServiceStatus.OK) {
-        //         let places = [...new Set(results)]
-        //         for (const place of places) {
-        //           // console.log('Place',place.name, place.geometry.location);
-        //         }
-        //       }
-        //     });
-        //   }
+          landmarks.forEach((waypoint) => {
+            const distances = steps.map(step => {
+              return window.google.maps.geometry.spherical.computeDistanceBetween(
+                new window.google.maps.LatLng(waypoint.latitude, waypoint.longitude),
+                new window.google.maps.LatLng(step.end_location.lat(), step.end_location.lng())
+              );
+            });
 
-          if(waypoints.length > 0) {
-              const request = {
-            origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
-            destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
-            waypoints: waypoints,
-            travelMode: window.google.maps.TravelMode.WALKING,
-          }
-        
-          directionsService.route(request, function(updatedRoute, updatedStatus) {
-            if(updatedStatus === 'OK') {
-              setDirectionsDisplay(new window.google.maps.DirectionsRenderer({
-                map: map,
-                directions: updatedRoute,
-                preserveViewport: true
-              }));
-              directionsDisplay.set('directions', null);  
+            const minDistance = Math.min(...distances);
+
+            if (minDistance <= radius) {
+              waypoints.push(waypoint);
             }
           });
-          } else {
-           window.alert('Directions request failed due to ' + status);
-          }
-       }
-    });
-  }, [destination]);
 
-  
+          // 12. START //
+          const placesService = new window.google.maps.places.PlacesService(map);
+
+          waypoints.forEach((waypoint) => {
+            const placesRequest = {
+              location: new window.google.maps.LatLng(waypoint.latitude, waypoint.longitude),
+              radius: 5,
+              type: ['museum', 'park', 'church', 'point_of_interest'],
+            };
+
+            placesService.nearbySearch(placesRequest, (results, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+                let places = [...new Set(results)];
+                for (const place of places) {
+                  console.log('Place', place.name, place.geometry.location.lat(), place.geometry.location.lng());
+                }
+              }
+            });
+          });
+          // 12. END //
+          const request = {
+            origin: new window.google.maps.LatLng(currentPosition.lat, currentPosition.lng),
+            destination: new window.google.maps.LatLng(destination.geometry.location.lat(), destination.geometry.location.lng()),
+            waypoints: waypoints.map(waypoint => ({
+              location: new window.google.maps.LatLng(waypoint.latitude, waypoint.longitude),
+              stopover: true
+            })),
+            optimizeWaypoints: true, // 14. START AND END //
+            travelMode: window.google.maps.TravelMode.WALKING,
+          };
+
+          directionsService.route(request, (updatedRoute, updatedStatus) => {
+            if (updatedStatus === 'OK') {
+              directionsDisplay.setDirections(updatedRoute);
+            } else {
+              window.alert('Directions request failed due to ' + updatedStatus);
+            }
+          });
+
+          // 13. START //
+          const mapClickListener = map.addListener('click', (event) => {
+            const clickedLat = event.latLng.lat();
+            const clickedLng = event.latLng.lng();
+
+            waypoints.forEach((waypoint) => {
+              const waypointLat = waypoint.latitude;
+              const waypointLng = waypoint.longitude;
+
+              const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+                new window.google.maps.LatLng(clickedLat, clickedLng),
+                new window.google.maps.LatLng(waypointLat, waypointLng)
+              );
+
+              if (distance <= 50) {
+                console.log('Clicked waypoint:', waypoint);
+              }
+            });
+          });
+
+          return () => {
+            window.google.maps.event.removeListener(mapClickListener);
+          };
+         // 13. END //
+        } else {
+          window.alert('Directions request failed due to ' + status);
+        }
+      }
+    );
+  }, [currentPosition, destination, landmarks, directionsDisplay, map]);
+
+
   return (
     <section>
       <div className='input-wrapper'>
